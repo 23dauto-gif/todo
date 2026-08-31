@@ -115,8 +115,6 @@
     color:var(--ink-soft);
     font-size:.92rem;
   }
-  .keynote p{margin:0 0 10px;max-width:52ch}
-  .keynote b{color:var(--ink);font-weight:600}
   .link{
     display:block;width:100%;
     font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
@@ -185,7 +183,6 @@
   </div>
 
   <div class="keynote" id="keynote" hidden>
-    <p id="keytext"></p>
     <input class="link" id="linkbox" readonly aria-label="Link to this list">
     <button class="copy" id="copyBtn" type="button">Copy the link</button>
   </div>
@@ -214,7 +211,6 @@ const empty = document.getElementById("empty");
 const field = document.getElementById("field");
 const sync = document.getElementById("sync");
 const keynote = document.getElementById("keynote");
-const keytext = document.getElementById("keytext");
 const linkbox = document.getElementById("linkbox");
 
 let items = {};
@@ -229,16 +225,12 @@ function makeKey() {
 }
 
 let key = location.hash.slice(1);
-const isNew = !/^[a-f0-9]{24}$/.test(key);
-if (isNew) {
+if (!/^[a-f0-9]{24}$/.test(key)) {
   key = makeKey();
   history.replaceState(null, "", "#" + key);
 }
 
 linkbox.value = location.href;
-keytext.innerHTML = isNew
-  ? "This is a brand new list. <b>Send this link to the person you\u2019re sharing with, and bookmark it yourself.</b> The key is in the link, so without it there is no way back to these items \u2014 not even for you."
-  : "Only people with this exact link can see or change the list. Keep it between the two of you.";
 keynote.hidden = false;
 
 document.getElementById("copyBtn").onclick = async e => {
