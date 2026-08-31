@@ -224,11 +224,20 @@ function makeKey() {
   return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 }
 
-let key = location.hash.slice(1);
-if (!/^[a-f0-9]{24}$/.test(key)) {
-  key = makeKey();
-  history.replaceState(null, "", "#" + key);
+const valid = k => /^[a-f0-9]{24}$/.test(k);
+
+// remember the key so a bare URL returns to the same list
+function remembered() {
+  try { return localStorage.getItem("todo-list-key"); } catch { return null; }
 }
+function rememberKey(k) {
+  try { localStorage.setItem("todo-list-key", k); } catch {}
+}
+
+let key = location.hash.slice(1);
+if (!valid(key)) key = valid(remembered()) ? remembered() : makeKey();
+history.replaceState(null, "", "#" + key);
+rememberKey(key);
 
 linkbox.value = location.href;
 keynote.hidden = false;
