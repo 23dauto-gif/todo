@@ -169,9 +169,20 @@
   .entry{padding:18px 0;border-bottom:1px solid var(--rule)}
   .entry-head{display:flex;align-items:baseline;gap:12px}
   .entry-name{
-    flex:1 1 auto;
+    flex:1 1 auto;min-width:0;
     font-family:"Libre Baskerville",Georgia,serif;font-size:1.05rem;
+    color:var(--ink);background:none;border:0;padding:0;
+    text-align:left;cursor:text;
   }
+  .entry-name:hover{text-decoration:underline dotted;text-underline-offset:4px}
+  .entry-name:focus-visible{outline:2px solid var(--moss);outline-offset:3px}
+  .name-edit{
+    flex:1 1 auto;min-width:0;
+    font-family:"Libre Baskerville",Georgia,serif;font-size:1.05rem;
+    color:var(--ink);background:transparent;
+    border:0;border-bottom:1.5px solid var(--moss);padding:0 0 2px;
+  }
+  .name-edit:focus{outline:none}
   .entry-date{flex:0 0 auto;font-size:.85rem;color:var(--bracken)}
   .shots{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   .shot{
@@ -619,7 +630,45 @@ document.getElementById("saveEntry").onclick = async () => {
   setTab("log");
 };
 
+let editingId = null;
+let pendingLog = false;
+
+function renameEntry(entry, head, nameEl) {
+  editingId = entry.id;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "name-edit";
+  input.maxLength = 120;
+  input.value = entry.text;
+  head.replaceChild(input, nameEl);
+  input.focus();
+  input.select();
+
+  let closed = false;
+  const finish = commit => {
+    if (closed) return;
+    closed = true;
+    const text = input.value.trim();
+    editingId = null;
+    pendingLog = false;
+    if (commit && text && text !== entry.text) {
+      entry.text = text;
+      if (db) update(ref(db, "lists/" + key + "/log/" + entry.id), { text });
+      else { entries[entry.id].text = text; }
+    }
+    renderLog();
+  };
+
+  input.onblur = () => finish(true);
+  input.onkeydown = e => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  };
+}
+
 function renderLog() {
+  if (editingId) { pendingLog = true; return; }
+  pendingLog = false;
   const rows = Object.entries(entries)
     .map(([id, v]) => ({ id, ...v }))
     .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.order || 0) - (a.order || 0));
@@ -632,9 +681,13 @@ function renderLog() {
     const head = document.createElement("div");
     head.className = "entry-head";
 
-    const name = document.createElement("span");
+    const name = document.createElement("button");
     name.className = "entry-name";
+    name.type = "button";
     name.textContent = entry.text;
+    name.title = "Click to rename";
+    name.setAttribute("aria-label", "Rename: " + entry.text);
+    name.onclick = () => renameEntry(entry, head, name);
 
     const date = document.createElement("span");
     date.className = "entry-date";
