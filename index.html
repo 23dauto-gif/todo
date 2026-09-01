@@ -181,6 +181,8 @@
   }
   .shot img{width:100%;height:100%;object-fit:cover;display:block}
   .shot:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+  .entry-foot{margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .entry-note{font-size:.8rem;color:var(--ink-soft)}
 
   /* --- log form --- */
   .logbtn{
@@ -287,7 +289,7 @@
     </div>
     <div class="row">
       <div>
-        <label for="fPhotos">Photographs (up to four)</label>
+        <label for="fPhotos">Photographs (more can be added later)</label>
         <input type="file" id="fPhotos" accept="image/*" multiple>
       </div>
     </div>
@@ -674,11 +676,78 @@ function renderLog() {
       wrap.appendChild(strip);
     }
 
+    const foot = document.createElement("div");
+    foot.className = "entry-foot";
+    const more = document.createElement("button");
+    more.className = "logbtn";
+    more.type = "button";
+    more.textContent = thumbs.length ? "Add more photographs" : "Add photographs";
+    const status = document.createElement("span");
+    status.className = "entry-note";
+    more.onclick = () => addPhotos(entry, status, more);
+    if (thumbs.length >= MAX_SHOTS) {
+      more.disabled = true;
+      more.textContent = "Full (" + MAX_SHOTS + " photographs)";
+    }
+    foot.append(more, status);
+    wrap.appendChild(foot);
+
     logBox.appendChild(wrap);
   });
 
   logEmpty.hidden = rows.length > 0;
   updateCount();
+}
+
+const MAX_SHOTS = 8;
+
+function addPhotos(entry, status, button) {
+  const room = MAX_SHOTS - (entry.thumbs || []).length;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.multiple = true;
+
+  input.onchange = async () => {
+    const files = Array.from(input.files).slice(0, room);
+    if (!files.length) return;
+    button.disabled = true;
+    status.textContent = "Preparing\u2026";
+
+    const fresh = [];
+    for (const f of files) {
+      try {
+        const [thumb, full] = await Promise.all([shrink(f, 300, 0.55), shrink(f, 1400, 0.72)]);
+        fresh.push({ thumb, full });
+      } catch {
+        status.textContent = "Couldn\u2019t read " + f.name;
+        button.disabled = false;
+        return;
+      }
+    }
+
+    const thumbs = (entry.thumbs || []).concat(fresh.map(x => x.thumb));
+
+    if (db) {
+      try {
+        const snap = await get(ref(db, "lists/" + key + "/photos/" + entry.id));
+        const full = (snap.val() || entry.thumbs || []).concat(fresh.map(x => x.full));
+        await update(ref(db, "lists/" + key + "/log/" + entry.id), { thumbs });
+        await set(ref(db, "lists/" + key + "/photos/" + entry.id), full);
+      } catch (e) {
+        status.textContent = "Couldn\u2019t save \u2014 check the database rules";
+        button.disabled = false;
+        console.error(e);
+        return;
+      }
+    } else {
+      entries[entry.id].thumbs = thumbs;
+      renderLog();
+    }
+    status.textContent = "";
+  };
+
+  input.click();
 }
 
 // ---------------- lightbox ----------------
