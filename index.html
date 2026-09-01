@@ -65,6 +65,20 @@
   .tally b{font-weight:600;color:var(--ink)}
   .sync{font-size:.82rem;color:var(--ink-soft);text-align:right}
 
+  .tabs{display:flex;gap:26px;margin:0 0 2px}
+  .tab{
+    font-family:"Libre Baskerville",Baskerville,Georgia,serif;
+    font-size:1rem;
+    background:none;border:0;cursor:pointer;
+    color:var(--ink-soft);
+    padding:6px 0;
+    border-bottom:2px solid transparent;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--oxblood)}
+  .tab:focus-visible{outline:2px solid var(--moss);outline-offset:3px}
+  .panel[hidden]{display:none}
+
   ul{list-style:none;margin:0;padding:0}
   li{
     display:flex;
@@ -152,16 +166,6 @@
   .add-btn:hover{background:#35492f}
 
   /* --- the log --- */
-  .logh{
-    font-family:"Libre Baskerville",Baskerville,Georgia,serif;
-    font-weight:700;font-size:1.5rem;
-    margin:56px 0 4px;
-    padding-top:26px;border-top:1px solid var(--rule);
-  }
-  .logsub{
-    font-family:"Libre Baskerville",Georgia,serif;font-style:italic;
-    color:var(--ink-soft);font-size:.95rem;margin:0 0 20px;
-  }
   .entry{padding:18px 0;border-bottom:1px solid var(--rule)}
   .entry-head{display:flex;align-items:baseline;gap:12px}
   .entry-name{
@@ -243,13 +247,18 @@
       </g>
     </svg>
     <h1>To Do List</h1>
-    <p class="standfirst">Upcoming adventures. Add them below, and tick them off as we go.</p>
+    <p class="standfirst" id="standfirst">Upcoming adventures. Add them below, and tick them off as we go.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabList" type="button" role="tab" aria-selected="true" aria-controls="panelList">The List</button>
+      <button class="tab" id="tabLog" type="button" role="tab" aria-selected="false" aria-controls="panelLog">The Log</button>
+    </div>
     <div class="tally">
-      <span><b id="kept">0</b> of <b id="total">0</b> kept</span>
+      <span id="count"><b>0</b> of <b>0</b> kept</span>
       <span class="sync" id="sync">Shared list &mdash; anyone with the link can edit</span>
     </div>
   </header>
 
+  <div class="panel" id="panelList" role="tabpanel" aria-labelledby="tabList">
   <ul id="list"></ul>
   <p class="empty" id="empty" hidden>Nothing here yet. Write the first adventure below.</p>
 
@@ -257,10 +266,9 @@
     <input class="add-field" id="field" type="text" placeholder="Somewhere to go, something to see" maxlength="120" aria-label="New adventure">
     <button class="add-btn" id="addBtn" type="button">Add to the list</button>
   </div>
+  </div>
 
-  <h2 class="logh">The Log</h2>
-  <p class="logsub">Where we’ve been, and what it looked like.</p>
-
+  <div class="panel" id="panelLog" role="tabpanel" aria-labelledby="tabLog" hidden>
   <div id="log"></div>
   <p class="empty" id="logempty" hidden>Nothing logged yet. Tick something off, then keep it here.</p>
 
@@ -286,6 +294,7 @@
     <p class="picked" id="picked"></p>
     <button class="ghost" id="saveEntry" type="button">Keep it</button>
     <button class="logbtn" id="cancelEntry" type="button">Cancel</button>
+  </div>
   </div>
 
   <div class="keynote" id="keynote" hidden>
@@ -453,7 +462,7 @@ function render() {
       logIt.className = "logbtn";
       logIt.type = "button";
       logIt.textContent = "Log it";
-      logIt.onclick = () => openForm(item.text, item.id);
+      logIt.onclick = () => { setTab("log"); openForm(item.text, item.id); };
       li.append(box, label, logIt, del);
     } else {
       li.append(box, label, del);
@@ -462,8 +471,7 @@ function render() {
   });
 
   empty.hidden = rows.length > 0;
-  document.getElementById("total").textContent = rows.length;
-  document.getElementById("kept").textContent = rows.filter(i => i.done).length;
+  updateCount();
 }
 
 function add() {
@@ -478,6 +486,40 @@ function add() {
 
 document.getElementById("addBtn").onclick = add;
 field.addEventListener("keydown", e => { if (e.key === "Enter") add(); });
+
+// ---------------- tabs ----------------
+const panels = {
+  list: document.getElementById("panelList"),
+  log: document.getElementById("panelLog")
+};
+const tabs = {
+  list: document.getElementById("tabList"),
+  log: document.getElementById("tabLog")
+};
+const standfirst = document.getElementById("standfirst");
+let tab = "list";
+
+function setTab(which) {
+  tab = which;
+  for (const k of ["list", "log"]) {
+    panels[k].hidden = k !== which;
+    tabs[k].setAttribute("aria-selected", String(k === which));
+  }
+  standfirst.textContent = which === "list"
+    ? "Upcoming adventures. Add them below, and tick them off as we go."
+    : "Where we\u2019ve been, and what it looked like.";
+  updateCount();
+}
+tabs.list.onclick = () => setTab("list");
+tabs.log.onclick = () => setTab("log");
+
+function updateCount() {
+  const rows = Object.values(items);
+  const n = Object.keys(entries).length;
+  document.getElementById("count").innerHTML = tab === "list"
+    ? "<b>" + rows.filter(i => i.done).length + "</b> of <b>" + rows.length + "</b> kept"
+    : "<b>" + n + "</b> " + (n === 1 ? "place logged" : "places logged");
+}
 
 // ---------------- the log ----------------
 const today = () => new Date().toISOString().slice(0, 10);
@@ -572,6 +614,7 @@ document.getElementById("saveEntry").onclick = async () => {
   form.hidden = true;
   shots = [];
   sourceItem = null;
+  setTab("log");
 };
 
 function renderLog() {
@@ -635,6 +678,7 @@ function renderLog() {
   });
 
   logEmpty.hidden = rows.length > 0;
+  updateCount();
 }
 
 // ---------------- lightbox ----------------
